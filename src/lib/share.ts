@@ -11,7 +11,6 @@ export type ShareFields = {
   personalMessage?: string;
   relationshipStartDate?: string;
   karwaChauthDate?: string;
-  husbandWhatsApp?: string;
 };
 
 const KEYS = {
@@ -20,7 +19,6 @@ const KEYS = {
   m: "personalMessage",
   s: "relationshipStartDate",
   k: "karwaChauthDate",
-  p: "husbandWhatsApp",
 } as const satisfies Record<string, keyof ShareFields>;
 
 const MAX = 1200;
@@ -57,7 +55,6 @@ export function decodeShare(code: string | null): Partial<StoryData> | null {
       const v = raw[short];
       if (typeof v === "string" && v.trim()) out[long] = v.trim().slice(0, MAX);
     }
-    if (out.husbandWhatsApp) out.husbandWhatsApp = out.husbandWhatsApp.replace(/\D/g, "");
     return out.wifeName && out.husbandName ? out : null;
   } catch {
     return null;

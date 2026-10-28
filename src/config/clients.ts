@@ -38,7 +38,6 @@ export function getClientStory(slug: string): StoryData | null {
     // details that only fit one couple never leak from the demo story
     relationshipStartDate: "",
     favoriteMemory: "",
-    husbandWhatsApp: "",
     ...c,
   };
 }

@@ -42,9 +42,6 @@ export type StoryData = {
   /** Optional: drop an mp3 into /public and put its path here, e.g. "/music.mp3".
    *  When empty, a soft generative tanpura + flute score is synthesised live. */
   musicUrl?: string;
-  /** Optional: WhatsApp number (with country code, digits only) for the final
-   *  "Send your love" button. Leave empty to let her pick the chat herself. */
-  husbandWhatsApp?: string;
 };
 
 export const storyData: StoryData = {
@@ -94,5 +91,4 @@ export const storyData: StoryData = {
   ],
 
   musicUrl: "",
-  husbandWhatsApp: "",
 };

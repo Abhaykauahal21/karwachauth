@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Heart } from "lucide-react";
 import BeatText from "@/components/ui/BeatText";
 import ReplayButton from "@/components/ui/ReplayButton";
 import type { SceneProps } from "./types";
@@ -22,8 +21,6 @@ export default function FinalScene({ beat, beatKey, shown }: SceneProps) {
 
 /** Darkness. One star stays. */
 export function EndScene({ story, onReplay }: SceneProps & { onReplay: () => void }) {
-  const reply = encodeURIComponent(`Happy Karwa Chauth, ${story.husbandName} ❤️ I watched our story… I love you.`);
-  const wa = `https://wa.me/${story.husbandWhatsApp ?? ""}?text=${reply}`;
   return (
     <motion.div
       className="absolute inset-0 flex flex-col items-center justify-center gap-10 px-7 text-center"
@@ -51,20 +48,7 @@ export function EndScene({ story, onReplay }: SceneProps & { onReplay: () => voi
         {story.karwaChauthDate && (
           <p className="-mt-4 font-sans text-[0.62rem] tracking-[0.4em] text-gold/60 uppercase">Karwa Chauth · {story.karwaChauthDate}</p>
         )}
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <a
-            data-ui
-            href={wa}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex h-11 items-center gap-2 rounded-full bg-gradient-to-r from-[#b98f4a] via-[#e9d3a1] to-[#b98f4a] px-6 font-sans text-xs font-medium tracking-[0.25em] text-[#1a1020] uppercase shadow-[0_0_30px_rgba(216,182,115,0.25)] transition-transform hover:scale-[1.03]"
-          >
-            <Heart size={14} strokeWidth={2} fill="currentColor" />
-            Send your love
-          </a>
-          <ReplayButton onReplay={onReplay} />
-        </div>
+        <ReplayButton onReplay={onReplay} />
       </motion.div>
     </motion.div>
   );

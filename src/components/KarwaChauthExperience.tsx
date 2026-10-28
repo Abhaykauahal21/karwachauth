@@ -25,7 +25,7 @@ function useStory(baseStory: StoryData): StoryData {
     if (typeof window === "undefined") return baseStory;
     const q = new URLSearchParams(window.location.search);
     const shared = decodeShare(q.get("d"));
-    if (shared) return { ...baseStory, relationshipStartDate: "", husbandWhatsApp: "", ...shared };
+    if (shared) return { ...baseStory, relationshipStartDate: "", ...shared };
     const w = q.get("w")?.trim();
     const h = q.get("h")?.trim();
     return { ...baseStory, wifeName: w || baseStory.wifeName, husbandName: h || baseStory.husbandName };

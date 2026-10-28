@@ -44,7 +44,6 @@ export default function LinkCreator() {
     personalMessage: "",
     relationshipStartDate: "",
     karwaChauthDate: storyData.karwaChauthDate,
-    husbandWhatsApp: "",
   });
   const [copied, setCopied] = useState(false);
   const set = (k: keyof ShareFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -110,16 +109,6 @@ export default function LinkCreator() {
             </Field>
           </div>
 
-          <Field label="Husband ka WhatsApp" hint="Optional. Story ke end mein wife isi number par “I love you” bhej payegi.">
-            <input
-              className={input}
-              value={f.husbandWhatsApp}
-              onChange={set("husbandWhatsApp")}
-              placeholder="919876543210"
-              inputMode="numeric"
-              maxLength={16}
-            />
-          </Field>
         </div>
 
         <section className="mt-10 rounded-2xl border border-gold/25 bg-[#0a1024]/70 p-5">
