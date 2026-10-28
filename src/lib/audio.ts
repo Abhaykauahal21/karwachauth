@@ -77,7 +77,6 @@ class GenerativeScore implements Score {
   private ctx?: AudioContext;
   private master!: GainNode;
   private tone!: BiquadFilterNode;
-  private verb!: ConvolverNode;
   private noise!: AudioBuffer;
   private timer = 0;
   private mood: Mood = { level: 0.5, bright: 0.3, flute: 0, bells: false };
@@ -96,9 +95,11 @@ class GenerativeScore implements Score {
   async start() {
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
-    const ctx = new Ctx();
+    // "playback" asks for a larger output buffer: far fewer crackles on phones
+    const ctx = new Ctx({ latencyHint: "playback" });
     this.ctx = ctx;
     await ctx.resume();
+    const light = window.matchMedia("(pointer: coarse)").matches || (navigator.hardwareConcurrency || 8) <= 4;
 
     this.master = ctx.createGain();
     this.master.gain.value = 0;
@@ -112,14 +113,11 @@ class GenerativeScore implements Score {
     this.tone.frequency.value = 1600;
     this.tone.Q.value = 0.4;
 
-    this.verb = ctx.createConvolver();
-    this.verb.buffer = this.impulse(4.2);
-    const wet = ctx.createGain();
-    wet.gain.value = 0.55;
     const dry = ctx.createGain();
     dry.gain.value = 0.7;
     this.tone.connect(dry).connect(this.master);
-    this.tone.connect(this.verb).connect(wet).connect(this.master);
+    if (light) this.echoSpace(this.tone, this.master);
+    else this.convolverSpace(this.tone, this.master);
 
     this.noise = this.noiseBuffer(3);
     this.pad();
@@ -128,7 +126,8 @@ class GenerativeScore implements Score {
     this.nextPluck = ctx.currentTime + 0.2;
     this.nextPhrase = ctx.currentTime + 6;
     this.nextBell = ctx.currentTime + 2;
-    this.timer = window.setInterval(() => this.tick(), 120);
+    this.tick();
+    this.timer = window.setInterval(() => this.tick(), 250);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.applyMood(4);
   }
@@ -172,7 +171,14 @@ class GenerativeScore implements Score {
   private tick() {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== "running") return;
-    const ahead = ctx.currentTime + 0.4;
+    // schedule well ahead on the audio clock, so a busy main thread (animations,
+    // canvas, scene changes) can never make a note late
+    const now = ctx.currentTime;
+    const ahead = now + 2.5;
+    // after a long stall (tab hidden, phone locked) skip missed notes instead of bursting them
+    if (this.nextPluck < now) this.nextPluck = now + 0.05;
+    if (this.nextPhrase < now) this.nextPhrase = now + 0.5;
+    if (this.nextBell < now) this.nextBell = now + 0.3;
 
     // tanpura: Pa – Sa' – Sa' – Sa, one cycle ≈ 4.8s
     while (this.nextPluck < ahead) {
@@ -216,15 +222,13 @@ class GenerativeScore implements Score {
     g.gain.exponentialRampToValueAtTime(amp, t + 0.03);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
     f.connect(g).connect(this.tone);
-    for (const detune of [-4, 3]) {
-      const o = ctx.createOscillator();
-      o.type = "sawtooth";
-      o.frequency.value = freq;
-      o.detune.value = detune;
-      o.connect(f);
-      o.start(t);
-      o.stop(t + 5.1);
-    }
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.value = freq;
+    o.detune.value = 2;
+    o.connect(f);
+    o.start(t);
+    o.stop(t + 5.1);
   }
 
   private pad() {
@@ -369,6 +373,41 @@ class GenerativeScore implements Score {
       o.connect(g).connect(this.tone);
       o.start(t);
       o.stop(t + decay + 0.1);
+    }
+  }
+
+  /** Rich convolution reverb for desktops. */
+  private convolverSpace(from: AudioNode, to: AudioNode) {
+    const ctx = this.ctx!;
+    const verb = ctx.createConvolver();
+    verb.buffer = this.impulse(3.2);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    from.connect(verb).connect(wet).connect(to);
+  }
+
+  /** Cheap feedback-delay "room" for phones — a fraction of the CPU of a convolver. */
+  private echoSpace(from: AudioNode, to: AudioNode) {
+    const ctx = this.ctx!;
+    const input = ctx.createGain();
+    const out = ctx.createGain();
+    from.connect(input);
+    out.connect(to);
+    out.gain.value = 0.42;
+    for (const [time, fb] of [
+      [0.23, 0.42],
+      [0.37, 0.36],
+    ]) {
+      const d = ctx.createDelay(1);
+      d.delayTime.value = time;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 1800;
+      const g = ctx.createGain();
+      g.gain.value = fb;
+      input.connect(d);
+      d.connect(lp).connect(g).connect(d);
+      lp.connect(out);
     }
   }
 
