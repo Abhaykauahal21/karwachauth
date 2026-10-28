@@ -67,6 +67,39 @@ function useWind() {
   }, []);
 }
 
+/**
+ * Keeps the phone screen from dimming and locking while the film plays
+ * (Screen Wake Lock API). The browser drops the lock whenever the page is
+ * hidden, so it is taken again each time she comes back to the story.
+ */
+function useWakeLock(active: boolean) {
+  useEffect(() => {
+    if (!active || !("wakeLock" in navigator)) return;
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
+    const request = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const next = await navigator.wakeLock.request("screen");
+        if (cancelled) next.release().catch(() => {});
+        else lock = next;
+      } catch {
+        /* not allowed right now (battery saver, unsupported) — the film still plays */
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && (!lock || lock.released)) request();
+    };
+    request();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      lock?.release().catch(() => {});
+    };
+  }, [active]);
+}
+
 export default function KarwaChauthExperience({ story: initialStory }: { story: StoryData }) {
   const story = useStory(initialStory);
   const beats = useMemo(() => buildTimeline(story), [story]);
@@ -82,6 +115,7 @@ export default function KarwaChauthExperience({ story: initialStory }: { story: 
   const lockUntil = useRef(0);
 
   useWind();
+  useWakeLock(phase === "playing");
 
   const beat = beats[Math.min(index, beats.length - 1)];
   const shown = reveal.key === index ? reveal.shown : 0;
