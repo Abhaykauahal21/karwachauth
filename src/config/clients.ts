@@ -10,6 +10,13 @@
  *  universal story in `story.ts` — dialogues, blessing, wedding memory,
  *  and a warm default letter — so a new client takes about a minute.
  *
+ *  Photos (optional): put them in /public/clients/<key>/ and list them:
+ *    photos: {
+ *      husband: "/clients/priya/husband.jpg",
+ *      memories: ["/clients/priya/1.jpg", "/clients/priya/2.jpg"],
+ *      couple: "/clients/priya/couple.jpg",
+ *    },
+ *
  *  After adding a client, redeploy; the new link works immediately.
  */
 import { storyData, type StoryData } from "./story";
@@ -38,6 +45,7 @@ export function getClientStory(slug: string): StoryData | null {
     // details that only fit one couple never leak from the demo story
     relationshipStartDate: "",
     favoriteMemory: "",
+    photos: {},
     ...c,
   };
 }

@@ -3,10 +3,12 @@
 import { motion } from "framer-motion";
 import BeatText from "@/components/ui/BeatText";
 import MoonPhase from "@/components/ui/MoonPhase";
+import { DreamPhoto } from "@/components/ui/Photo";
 import type { SceneProps } from "./types";
 
 /** A clean moonlit page: their names, and what he wanted to say. */
-export default function PersonalMessageScene({ beat, beatKey, shown }: SceneProps) {
+export default function PersonalMessageScene({ beat, beatKey, shown, story }: SceneProps) {
+  const couple = story.photos?.couple;
   return (
     <motion.div
       className="absolute inset-0 flex flex-col items-center justify-start px-7 pt-[33vh] sm:pt-[31vh]"
@@ -16,6 +18,14 @@ export default function PersonalMessageScene({ beat, beatKey, shown }: SceneProp
       transition={{ duration: 2 }}
     >
       <div className="absolute inset-0 bg-[radial-gradient(70%_55%_at_50%_50%,rgba(2,4,10,0.65),transparent)]" />
+      {/* the two of them, up in the night sky above the letter */}
+      {couple && (
+        <DreamPhoto
+          src={couple}
+          alt={`${story.husbandName} and ${story.wifeName}`}
+          className="absolute left-1/2 top-[3vh] h-[28vh] w-[min(90vw,520px)] -translate-x-1/2"
+        />
+      )}
       <motion.div
         className="relative mb-6 flex items-center gap-3 opacity-70"
         initial={{ opacity: 0, scaleX: 0.4 }}

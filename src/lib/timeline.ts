@@ -1,4 +1,4 @@
-import type { Speaker, StoryData } from "@/config/story";
+import type { Memory, Speaker, StoryData } from "@/config/story";
 import type { SceneId } from "./scenes";
 
 export type TextStyle =
@@ -21,6 +21,8 @@ export type Beat = {
   hearts?: boolean;
   /** wait for a tap instead of auto-advancing */
   hold?: boolean;
+  /** a real photo shown with this beat (memory polaroids) */
+  photo?: string;
   /** ms after the beat starts before each line appears */
   delays: number[];
   /** ms until auto-advance */
@@ -148,15 +150,21 @@ export function buildTimeline(d: StoryData): Beat[] {
   beats.push({ scene: "aarti", speaker: "husband", lines: ["Tum ho…", "toh har din tyohaar hai."], style: "dialogue", linger: 3000 });
 
   // ── 9. Memory montage ──────────────────────────────────────────
-  const memories = [...d.memories];
+  const photos = d.photos?.memories ?? [];
+  const memories: (Memory & { photo?: string })[] = d.memories.map((m, i) => ({ ...m, photo: photos[i] || undefined }));
   if (d.favoriteMemory) {
     const at = memories.findIndex((m) => m.visual === "wedding");
-    memories.splice(at < 0 ? memories.length : at, 0, { visual: "walk", lines: ["Aur yaad hai…", "Humari pehli {memory}?"] });
+    memories.splice(at < 0 ? memories.length : at, 0, {
+      visual: "walk",
+      lines: ["Aur yaad hai…", "Humari pehli {memory}?"],
+      photo: undefined,
+    });
   }
   memories.forEach((m, i) =>
     beats.push({
       scene: "memory",
       sub: m.visual,
+      photo: m.photo,
       lines: f(m.lines),
       style: "serif",
       lead: i === 0 ? 2200 : 1400,

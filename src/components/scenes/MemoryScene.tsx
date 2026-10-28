@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { MemoryVisual } from "@/config/story";
 import BeatText from "@/components/ui/BeatText";
+import { DreamPhoto } from "@/components/ui/Photo";
 import type { SceneProps } from "./types";
 
 /*
@@ -333,7 +334,7 @@ export default function MemoryScene({ beat, beatKey, shown }: SceneProps) {
           key={visual}
           className="absolute inset-0"
           initial={{ opacity: 0, scale: 1.06 }}
-          animate={{ opacity: 1, scale: 1 }}
+          animate={{ opacity: beat.photo ? 0.4 : 1, scale: 1 }}
           exit={{ opacity: 0, transition: { duration: 1.8 } }}
           transition={{ opacity: { duration: 2 }, scale: { duration: 12, ease: "linear" } }}
         >
@@ -357,11 +358,24 @@ export default function MemoryScene({ beat, beatKey, shown }: SceneProps) {
         </motion.div>
       </AnimatePresence>
 
+      {/* the real moment, up in the sky like a dream; the words sit beneath it */}
+      <AnimatePresence>
+        {beat.photo && (
+          <DreamPhoto
+            key={beat.photo}
+            src={beat.photo}
+            className="absolute left-1/2 top-[6%] h-[38%] w-[min(92vw,560px)] -translate-x-1/2 sm:top-[5%] sm:h-[42%]"
+          />
+        )}
+      </AnimatePresence>
+
       <BeatText
         beat={beat}
         beatKey={beatKey}
         shown={shown}
-        className="absolute inset-x-0 top-[15%] mx-auto flex max-w-xl justify-center px-7 sm:top-[13%]"
+        className={`absolute inset-x-0 mx-auto flex max-w-xl justify-center px-7 ${
+          beat.photo ? "top-[47%] sm:top-[50%]" : "top-[15%] sm:top-[13%]"
+        }`}
       />
     </motion.div>
   );

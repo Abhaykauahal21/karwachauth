@@ -26,6 +26,16 @@ export type Memory = {
   lines: string[];
 };
 
+/** Real photos of the couple. Paths in /public ("/clients/aarohi/husband.jpg") or https URLs. */
+export type StoryPhotos = {
+  /** His face, seen through the channi right after the moon. */
+  husband?: string;
+  /** One per memory, in the same order, shown as polaroids in the montage. */
+  memories?: string[];
+  /** The two of them, above the personal letter. */
+  couple?: string;
+};
+
 export type StoryData = {
   wifeName: string;
   husbandName: string;
@@ -42,6 +52,8 @@ export type StoryData = {
   /** Optional: drop an mp3 into /public and put its path here, e.g. "/music.mp3".
    *  When empty, a soft generative tanpura + flute score is synthesised live. */
   musicUrl?: string;
+  /** Optional real photos; without them the illustrated scenes are used. */
+  photos?: StoryPhotos;
 };
 
 export const storyData: StoryData = {
@@ -91,4 +103,5 @@ export const storyData: StoryData = {
   ],
 
   musicUrl: "",
+  photos: {},
 };

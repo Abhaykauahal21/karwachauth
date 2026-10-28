@@ -5,6 +5,7 @@ import Channi from "@/components/props/Channi";
 import Moon from "@/components/world/Moon";
 import HusbandPortrait from "@/components/characters/HusbandPortrait";
 import BeatText from "@/components/ui/BeatText";
+import Photo from "@/components/ui/Photo";
 import type { SceneProps } from "./types";
 
 const EASE = [0.45, 0.05, 0.2, 1] as const;
@@ -39,8 +40,9 @@ function Hands() {
  * The climax. She raises the channi: first the moon through its mesh —
  * then the camera tilts down, and it is his face.
  */
-export default function ChanniScene({ beat, beatKey, shown }: SceneProps) {
+export default function ChanniScene({ beat, beatKey, shown, story }: SceneProps) {
   const him = beat.sub === "him";
+  const face = story.photos?.husband;
   return (
     <>
       <motion.div
@@ -76,7 +78,7 @@ export default function ChanniScene({ beat, beatKey, shown }: SceneProps) {
                 animate={{ filter: him ? "blur(0px)" : "blur(6px)" }}
                 transition={{ duration: 4, delay: him ? 2.2 : 0 }}
               >
-                <HusbandPortrait />
+                {face ? <Photo src={face} alt={story.husbandName} className="h-full w-full" /> : <HusbandPortrait />}
               </motion.div>
             </motion.div>
           </Channi>

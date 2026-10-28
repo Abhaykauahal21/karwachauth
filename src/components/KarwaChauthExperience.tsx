@@ -7,6 +7,7 @@ import { buildTimeline } from "@/lib/timeline";
 import { SCENES } from "@/lib/scenes";
 import { createScore, type Score } from "@/lib/audio";
 import { decodeShare } from "@/lib/share";
+import { preloadPhotos } from "./ui/Photo";
 import World from "./world/World";
 import FloatingParticles, { burst } from "./world/FloatingParticles";
 import SceneOverlay from "./scenes";
@@ -213,12 +214,13 @@ export default function KarwaChauthExperience({ story: initialStory }: { story: 
     const at = jump ? beats.findIndex((b) => b.scene === jump) : -1;
     if (at > 0) setIndex(at);
     setPhase("playing");
+    preloadPhotos([story.photos?.husband, story.photos?.couple, ...(story.photos?.memories ?? [])]);
     if (!score.current) {
       score.current = createScore(story.musicUrl);
       await score.current.start();
       score.current.setMood(SCENES[beats[Math.max(0, at)].scene].mood);
     }
-  }, [beats, story.musicUrl]);
+  }, [beats, story.musicUrl, story.photos]);
 
   // preview helper: ?auto=1 skips the preloader (music stays off without a tap)
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import KarwaChauthExperience from "@/components/KarwaChauthExperience";
 import { clients, getClientStory } from "@/config/clients";
 
@@ -19,9 +20,18 @@ export async function generateMetadata({ params }: PageProps<"/[slug]">): Promis
   };
 }
 
-export default async function ClientPage({ params }: PageProps<"/[slug]">) {
+async function ClientStory({ params }: { params: PageProps<"/[slug]">["params"] }) {
   const { slug } = await params;
   const story = getClientStory(slug);
   if (!story) notFound();
   return <KarwaChauthExperience story={story} />;
+}
+
+// reading params inside Suspense keeps the page shell instant (the night-dark fallback matches the preloader)
+export default function ClientPage({ params }: PageProps<"/[slug]">) {
+  return (
+    <Suspense fallback={<div className="fixed inset-0 bg-[#02040a]" />}>
+      <ClientStory params={params} />
+    </Suspense>
+  );
 }

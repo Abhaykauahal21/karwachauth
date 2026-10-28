@@ -1,21 +1,40 @@
 /**
- * A tiny generative score, synthesised live with the Web Audio API —
+ * A love theme for bansuri, synthesised live with the Web Audio API —
  * no audio files to download.
  *
- *  • tanpura drone (Pa–Sa–Sa–Sa) with a jawari-like filter bloom
- *  • soft ambient pad
- *  • bansuri-style flute phrases in raag Bhupali (D E F# A B)
- *  • temple ghanti during the aarti
- *  • very soft night wind
+ * Only the flute: no drone, no bass, no bells. It plays a composed,
+ * slow romantic melody in D major (with the longing of B minor), in the
+ * flute's warm middle register: soft swells, slow meend glides between
+ * notes, and a late vibrato on the long notes.
  *
  * If `musicUrl` is set in the story config, that file is played instead.
  */
 import type { Mood } from "./scenes";
 
-const SA = 146.83; // D3
 const midi = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
-// Bhupali in D across two octaves (flute register)
-const SCALE = [62, 64, 66, 69, 71, 74, 76, 78, 81, 83].map(midi);
+
+/** One beat of the theme, in seconds — slow, like a heartbeat at rest. */
+const BEAT = 0.8;
+
+/** [midi note, beats, slide into it with meend?] */
+type Note = [number, number, boolean?];
+
+// D4 62 · E4 64 · F#4 66 · G4 67 · A4 69 · B4 71 · C#5 73 · D5 74 · E5 76 · F#5 78
+const PHRASES: Note[][] = [
+  // 0 — a tender opening
+  [[69, 1.5], [71, 0.75], [69, 0.75], [66, 2, true], [64, 0.75], [66, 0.75], [62, 3.5, true]],
+  // 1 — longing, reaching up
+  [[66, 1], [69, 1], [74, 2.5, true], [73, 0.75], [71, 0.75], [69, 3, true]],
+  // 2 — a sigh falling back down
+  [[71, 1.25], [69, 0.6], [67, 0.6], [66, 2, true], [64, 1], [62, 1], [64, 3.5, true]],
+  // 3 — coming home
+  [[69, 1], [66, 1], [69, 1], [71, 1.75, true], [69, 0.9], [66, 0.9], [62, 4, true]],
+  // 4 — the heart swells
+  [[74, 1.75], [76, 0.9], [78, 2.75, true], [76, 0.75], [74, 0.75], [71, 1.5, true], [69, 3.5, true]],
+  // 5 — a gentle answer
+  [[67, 1], [69, 1], [71, 2, true], [69, 0.75], [67, 0.75], [66, 1.25], [64, 1], [62, 3.75, true]],
+];
+const ORDER = [0, 1, 2, 3, 0, 4, 5, 3];
 
 export interface Score {
   start(): Promise<void>;
@@ -77,15 +96,12 @@ class GenerativeScore implements Score {
   private ctx?: AudioContext;
   private master!: GainNode;
   private tone!: BiquadFilterNode;
-  private noise!: AudioBuffer;
   private timer = 0;
+  private light = false;
   private mood: Mood = { level: 0.5, bright: 0.3, flute: 0, bells: false };
   private muted = false;
-  private nextPluck = 0;
-  private pluckIdx = 0;
   private nextPhrase = 0;
-  private nextBell = 0;
-  private lastNote = 5;
+  private phraseIdx = 0;
   private onVisibility = () => {
     if (!this.ctx) return;
     if (document.hidden) this.ctx.suspend();
@@ -99,33 +115,27 @@ class GenerativeScore implements Score {
     const ctx = new Ctx({ latencyHint: "playback" });
     this.ctx = ctx;
     await ctx.resume();
-    const light = window.matchMedia("(pointer: coarse)").matches || (navigator.hardwareConcurrency || 8) <= 4;
+    this.light = window.matchMedia("(pointer: coarse)").matches || (navigator.hardwareConcurrency || 8) <= 4;
 
     this.master = ctx.createGain();
     this.master.gain.value = 0;
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -18;
-    comp.ratio.value = 3;
+    comp.threshold.value = -20;
+    comp.ratio.value = 2.5;
     this.master.connect(comp).connect(ctx.destination);
 
     this.tone = ctx.createBiquadFilter();
     this.tone.type = "lowpass";
-    this.tone.frequency.value = 1600;
-    this.tone.Q.value = 0.4;
+    this.tone.frequency.value = 1400;
+    this.tone.Q.value = 0.3;
 
     const dry = ctx.createGain();
-    dry.gain.value = 0.7;
+    dry.gain.value = 0.72;
     this.tone.connect(dry).connect(this.master);
-    if (light) this.echoSpace(this.tone, this.master);
+    if (this.light) this.echoSpace(this.tone, this.master);
     else this.convolverSpace(this.tone, this.master);
 
-    this.noise = this.noiseBuffer(3);
-    this.pad();
-    this.wind();
-
-    this.nextPluck = ctx.currentTime + 0.2;
-    this.nextPhrase = ctx.currentTime + 6;
-    this.nextBell = ctx.currentTime + 2;
+    this.nextPhrase = ctx.currentTime + 1.2;
     this.tick();
     this.timer = window.setInterval(() => this.tick(), 250);
     document.addEventListener("visibilitychange", this.onVisibility);
@@ -159,13 +169,14 @@ class GenerativeScore implements Score {
   private applyMood(seconds: number) {
     if (!this.ctx || !this.master) return;
     const t = this.ctx.currentTime;
-    const level = this.muted ? 0 : 0.18 + this.mood.level * 0.5;
+    const level = this.muted ? 0 : 0.22 + this.mood.level * 0.45;
     this.master.gain.cancelScheduledValues(t);
     this.master.gain.setValueAtTime(this.master.gain.value, t);
     this.master.gain.linearRampToValueAtTime(level, t + seconds);
+    // the filter never opens past ~2.4 kHz: everything stays round and soft
     this.tone.frequency.cancelScheduledValues(t);
     this.tone.frequency.setValueAtTime(this.tone.frequency.value, t);
-    this.tone.frequency.exponentialRampToValueAtTime(700 + this.mood.bright * 4200, t + seconds);
+    this.tone.frequency.exponentialRampToValueAtTime(900 + this.mood.bright * 1500, t + seconds);
   }
 
   private tick() {
@@ -176,213 +187,91 @@ class GenerativeScore implements Score {
     const now = ctx.currentTime;
     const ahead = now + 2.5;
     // after a long stall (tab hidden, phone locked) skip missed notes instead of bursting them
-    if (this.nextPluck < now) this.nextPluck = now + 0.05;
-    if (this.nextPhrase < now) this.nextPhrase = now + 0.5;
-    if (this.nextBell < now) this.nextBell = now + 0.3;
+    if (this.nextPhrase < now) this.nextPhrase = now + 1;
 
-    // tanpura: Pa – Sa' – Sa' – Sa, one cycle ≈ 4.8s
-    while (this.nextPluck < ahead) {
-      const strings = [SA * 0.75, SA, SA, SA / 2];
-      const gaps = [1.1, 1.1, 1.3, 1.3];
-      const i = this.pluckIdx % 4;
-      this.pluck(strings[i], this.nextPluck, i === 3 ? 0.2 : 0.13);
-      this.nextPluck += gaps[i];
-      this.pluckIdx++;
-    }
-
-    if (this.mood.flute > 0.02 && this.nextPhrase < ahead) {
+    // the flute is the whole score, so it only pauses to breathe between phrases
+    if (this.nextPhrase < ahead) {
       const end = this.phrase(this.nextPhrase);
-      this.nextPhrase = end + 2.5 + (1 - this.mood.flute) * 9 + Math.random() * 4;
-    } else if (this.mood.flute <= 0.02 && this.nextPhrase < ahead) {
-      this.nextPhrase = ahead + 2;
-    }
-
-    if (this.nextBell < ahead) {
-      if (this.mood.bells) {
-        this.bell(this.nextBell, 0.06 + Math.random() * 0.04);
-        this.nextBell += 0.9 + Math.random() * 1.6;
-      } else {
-        // a rare, distant wind-chime even outside the aarti
-        if (Math.random() < 0.18) this.bell(this.nextBell, 0.018, 2.2);
-        this.nextBell += 6 + Math.random() * 8;
-      }
+      this.nextPhrase = end + 0.7 + (1 - Math.max(0.35, this.mood.flute)) * 1.6;
     }
   }
 
-  private pluck(freq: number, t: number, amp: number) {
-    const ctx = this.ctx!;
-    const g = ctx.createGain();
-    const f = ctx.createBiquadFilter();
-    f.type = "lowpass";
-    f.Q.value = 3;
-    f.frequency.setValueAtTime(500, t);
-    f.frequency.linearRampToValueAtTime(2600, t + 0.6); // jawari bloom
-    f.frequency.exponentialRampToValueAtTime(700, t + 4);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(amp, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
-    f.connect(g).connect(this.tone);
-    const o = ctx.createOscillator();
-    o.type = "sawtooth";
-    o.frequency.value = freq;
-    o.detune.value = 2;
-    o.connect(f);
-    o.start(t);
-    o.stop(t + 5.1);
-  }
-
-  private pad() {
-    const ctx = this.ctx!;
-    const g = ctx.createGain();
-    g.gain.value = 0.035;
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.value = 0.07;
-    lfoGain.gain.value = 0.018;
-    lfo.connect(lfoGain).connect(g.gain);
-    lfo.start();
-    g.connect(this.tone);
-    for (const [f, d] of [
-      [SA, 0],
-      [SA * 1.5, 5],
-      [SA * 2, -6],
-      [SA * 2.5, 4],
-    ]) {
-      const o = ctx.createOscillator();
-      o.type = "sine";
-      o.frequency.value = f;
-      o.detune.value = d;
-      o.connect(g);
-      o.start();
-    }
-  }
-
-  private wind() {
-    const ctx = this.ctx!;
-    const src = ctx.createBufferSource();
-    src.buffer = this.noise;
-    src.loop = true;
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 500;
-    bp.Q.value = 0.6;
-    const g = ctx.createGain();
-    g.gain.value = 0.022;
-    const lfo = ctx.createOscillator();
-    const lg = ctx.createGain();
-    lfo.frequency.value = 0.05;
-    lg.gain.value = 260;
-    lfo.connect(lg).connect(bp.frequency);
-    lfo.start();
-    src.connect(bp).connect(g).connect(this.master);
-    src.start();
-  }
-
-  /** One bansuri phrase with meend (glides) between notes. Returns end time. */
+  /**
+   * Plays the next phrase of the love theme. Every note swells softly and
+   * fades, long notes bloom into a late vibrato, and marked notes slide in
+   * with a slow meend. Intimate scenes breathe a little slower. Returns end time.
+   */
   private phrase(t0: number) {
     const ctx = this.ctx!;
-    const count = 3 + Math.floor(Math.random() * 4);
-    const notes: number[] = [];
-    let n = this.lastNote;
-    for (let i = 0; i < count; i++) {
-      n = Math.max(1, Math.min(SCALE.length - 2, n + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
-      notes.push(n);
-    }
-    // phrases resolve home to Sa or Pa
-    notes.push(Math.random() < 0.6 ? 5 : 3);
-    this.lastNote = notes[notes.length - 1];
-
-    const durs = notes.map((_, i) => (i === notes.length - 1 ? 2.6 + Math.random() : [0.55, 0.8, 1.1, 1.5][Math.floor(Math.random() * 4)]));
-    const total = durs.reduce((a, b) => a + b, 0);
+    const notes = PHRASES[ORDER[this.phraseIdx % ORDER.length]];
+    this.phraseIdx++;
+    const slow = 1 + (1 - this.mood.level) * 0.3;
 
     const osc = ctx.createOscillator();
     osc.type = "sine";
-    const over = ctx.createOscillator();
-    over.type = "triangle";
-    const overGain = ctx.createGain();
-    overGain.gain.value = 0.12;
+    // a whisper of the 2nd and 3rd harmonics gives the hollow, breathy bansuri colour
+    const h2 = ctx.createOscillator();
+    const h3 = ctx.createOscillator();
+    h2.type = h3.type = "sine";
+    const h2Gain = ctx.createGain();
+    const h3Gain = ctx.createGain();
+    h2Gain.gain.value = 0.07;
+    h3Gain.gain.value = 0.018;
     const vib = ctx.createOscillator();
     const vibGain = ctx.createGain();
-    vib.frequency.value = 5.2;
+    vib.frequency.value = 4.8;
     vibGain.gain.setValueAtTime(0, t0);
-    vibGain.gain.linearRampToValueAtTime(7, t0 + total);
     vib.connect(vibGain);
-    vibGain.connect(osc.detune);
-    vibGain.connect(over.detune);
+    for (const o of [osc, h2, h3]) vibGain.connect(o.detune);
 
     const amp = ctx.createGain();
     amp.gain.setValueAtTime(0.0001, t0);
-
-    // breath
-    const breath = ctx.createBufferSource();
-    breath.buffer = this.noise;
-    const bf = ctx.createBiquadFilter();
-    bf.type = "bandpass";
-    bf.Q.value = 2;
-    const bg = ctx.createGain();
-    bg.gain.value = 0.25;
+    amp.gain.linearRampToValueAtTime(0.085, t0 + 0.4);
 
     let t = t0;
-    notes.forEach((ni, i) => {
-      const f = SCALE[ni];
+    notes.forEach(([m, beats, slide], i) => {
+      const d = beats * BEAT * slow;
+      const f = midi(m);
       if (i === 0) {
         osc.frequency.setValueAtTime(f, t);
-        over.frequency.setValueAtTime(f * 2, t);
-        bf.frequency.setValueAtTime(f * 2, t);
-        amp.gain.exponentialRampToValueAtTime(0.11, t + 0.25);
+        h2.frequency.setValueAtTime(f * 2, t);
+        h3.frequency.setValueAtTime(f * 3, t);
       } else {
-        const glide = Math.random() < 0.35 ? 0.18 : 0.05;
+        // meend: a slow, singing slide; otherwise a gentle legato step
+        const glide = slide ? 0.17 : 0.035;
         osc.frequency.setTargetAtTime(f, t, glide);
-        over.frequency.setTargetAtTime(f * 2, t, glide);
-        bf.frequency.setTargetAtTime(f * 2, t, glide);
-        amp.gain.setTargetAtTime(0.085, t - 0.04, 0.03);
-        amp.gain.setTargetAtTime(0.11, t + 0.04, 0.08);
+        h2.frequency.setTargetAtTime(f * 2, t, glide);
+        h3.frequency.setTargetAtTime(f * 3, t, glide);
+        if (!slide) amp.gain.setTargetAtTime(0.07, t - 0.05, 0.04);
       }
-      t += durs[i];
+      // each note breathes: rises into its middle, then softens
+      amp.gain.setTargetAtTime(0.11, t + 0.06, d * 0.25);
+      amp.gain.setTargetAtTime(0.08, t + d * 0.55, d * 0.3);
+      // vibrato only blooms on long notes, and only after a moment — like a real player
+      vibGain.gain.setTargetAtTime(0, t, 0.05);
+      if (d > 1) vibGain.gain.setTargetAtTime(8, t + 0.5, 0.35);
+      t += d;
     });
-    amp.gain.setTargetAtTime(0.0001, t - 1.2, 0.4);
+    amp.gain.setTargetAtTime(0.0001, t - 1.1, 0.4);
 
     osc.connect(amp);
-    over.connect(overGain).connect(amp);
-    breath.connect(bf).connect(bg).connect(amp);
+    h2.connect(h2Gain).connect(amp);
+    h3.connect(h3Gain).connect(amp);
     amp.connect(this.tone);
-    for (const o of [osc, over, vib]) {
+    for (const o of [osc, h2, h3, vib]) {
       o.start(t0);
-      o.stop(t + 0.5);
+      o.stop(t + 0.8);
     }
-    breath.start(t0);
-    breath.stop(t + 0.5);
     return t;
-  }
-
-  private bell(t: number, amp: number, pitch = 1) {
-    const ctx = this.ctx!;
-    const base = (1100 + Math.random() * 500) * pitch;
-    for (const [ratio, a, decay] of [
-      [1, 1, 2.6],
-      [2.32, 0.5, 1.6],
-      [4.25, 0.28, 0.9],
-      [6.63, 0.14, 0.5],
-    ]) {
-      const o = ctx.createOscillator();
-      o.frequency.value = base * ratio;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(amp * a, t + 0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-      o.connect(g).connect(this.tone);
-      o.start(t);
-      o.stop(t + decay + 0.1);
-    }
   }
 
   /** Rich convolution reverb for desktops. */
   private convolverSpace(from: AudioNode, to: AudioNode) {
     const ctx = this.ctx!;
     const verb = ctx.createConvolver();
-    verb.buffer = this.impulse(3.2);
+    verb.buffer = this.impulse(3.6);
     const wet = ctx.createGain();
-    wet.gain.value = 0.55;
+    wet.gain.value = 0.7;
     from.connect(verb).connect(wet).connect(to);
   }
 
@@ -393,10 +282,10 @@ class GenerativeScore implements Score {
     const out = ctx.createGain();
     from.connect(input);
     out.connect(to);
-    out.gain.value = 0.42;
+    out.gain.value = 0.5;
     for (const [time, fb] of [
-      [0.23, 0.42],
-      [0.37, 0.36],
+      [0.27, 0.48],
+      [0.41, 0.42],
     ]) {
       const d = ctx.createDelay(1);
       d.delayTime.value = time;
@@ -419,15 +308,6 @@ class GenerativeScore implements Score {
       const d = buf.getChannelData(c);
       for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
     }
-    return buf;
-  }
-
-  private noiseBuffer(seconds: number) {
-    const ctx = this.ctx!;
-    const len = Math.floor(ctx.sampleRate * seconds);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     return buf;
   }
 }
