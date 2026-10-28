@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StoryData } from "@/config/story";
 import { buildTimeline } from "@/lib/timeline";
 import { SCENES } from "@/lib/scenes";
-import { createScore, type Score } from "@/lib/audio";
+import { createScore, type FluteStyle, type Score } from "@/lib/audio";
 import { decodeShare } from "@/lib/share";
 import { preloadPhotos } from "./ui/Photo";
 import World from "./world/World";
@@ -78,6 +78,7 @@ export default function KarwaChauthExperience({ story: initialStory }: { story: 
   const [shootKey, setShootKey] = useState(0);
   const [touched, setTouched] = useState(false);
   const score = useRef<Score | null>(null);
+  const scoreStarted = useRef(false);
   const lockUntil = useRef(0);
 
   useWind();
@@ -205,7 +206,19 @@ export default function KarwaChauthExperience({ story: initialStory }: { story: 
     };
   }, [playing, advance, go]);
 
-  useEffect(() => () => score.current?.dispose(), []);
+  // build the score on the start screen, so a music file is already buffering before "Begin"
+  useEffect(() => {
+    // preview helper: ?flute=krishna or ?flute=love to compare the two themes
+    const flute = new URLSearchParams(window.location.search).get("flute");
+    const style: FluteStyle = flute === "krishna" || flute === "love" ? flute : (story.fluteStyle ?? "love");
+    const created = createScore(story.musicUrl, style);
+    score.current = created;
+    scoreStarted.current = false;
+    return () => {
+      created.dispose();
+      if (score.current === created) score.current = null;
+    };
+  }, [story.musicUrl, story.fluteStyle]);
 
   // ── controls ────────────────────────────────────────────────
   const begin = useCallback(async () => {
@@ -215,12 +228,14 @@ export default function KarwaChauthExperience({ story: initialStory }: { story: 
     if (at > 0) setIndex(at);
     setPhase("playing");
     preloadPhotos([story.photos?.husband, story.photos?.couple, ...(story.photos?.memories ?? [])]);
-    if (!score.current) {
-      score.current = createScore(story.musicUrl);
-      await score.current.start();
-      score.current.setMood(SCENES[beats[Math.max(0, at)].scene].mood);
+    // start inside the tap: browsers (iOS especially) only allow sound from a user gesture
+    if (score.current && !scoreStarted.current) {
+      scoreStarted.current = true;
+      const current = score.current;
+      await current.start();
+      current.setMood(SCENES[beats[Math.max(0, at)].scene].mood);
     }
-  }, [beats, story.musicUrl, story.photos]);
+  }, [beats, story.photos]);
 
   // preview helper: ?auto=1 skips the preloader (music stays off without a tap)
   useEffect(() => {

@@ -19,6 +19,8 @@ export type Dialogue = {
   lines: string[];
 };
 
+import type { FluteStyle } from "@/lib/audio";
+
 export type MemoryVisual = "walk" | "sit" | "lights" | "wedding" | "rain";
 
 export type Memory = {
@@ -49,9 +51,11 @@ export type StoryData = {
   dialogues: Dialogue[];
   blessing: string[];
   memories: Memory[];
-  /** Optional: drop an mp3 into /public and put its path here, e.g. "/music.mp3".
-   *  When empty, a soft generative tanpura + flute score is synthesised live. */
+  /** Your own music: put the file in /public and its path here, e.g. "/music.mp3".
+   *  If it is empty, missing or won't play, the synthesised bansuri plays instead. */
   musicUrl?: string;
+  /** "love" (soft romantic) or "krishna" (Krishna-style bansuri with ornaments). */
+  fluteStyle?: FluteStyle;
   /** Optional real photos; without them the illustrated scenes are used. */
   photos?: StoryPhotos;
 };
@@ -102,6 +106,7 @@ export const storyData: StoryData = {
     { visual: "wedding", lines: ["Aur phir woh din aaya…", "jab saat pheron ke saath tum meri zindagi ka hissa bani."] },
   ],
 
-  musicUrl: "",
+  musicUrl: "/music.mp3",
+  fluteStyle: "love",
   photos: {},
 };
