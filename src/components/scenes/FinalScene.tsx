@@ -50,6 +50,20 @@ export function EndScene({ story, onReplay }: SceneProps & { onReplay: () => voi
         )}
         <ReplayButton onReplay={onReplay} />
       </motion.div>
+
+      <motion.a
+        data-ui
+        href="https://www.theangaarbatch.in/"
+        target="_blank"
+        rel="noopener"
+        onClick={(e) => e.stopPropagation()}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 2, delay: 8 }}
+        className="absolute inset-x-0 bottom-[max(1.5rem,env(safe-area-inset-bottom))] mx-auto w-fit font-sans text-[0.62rem] tracking-[0.35em] text-ivory/40 uppercase transition-colors hover:text-gold-soft"
+      >
+        Crafted by <span className="text-gold/70">The Angaar Labs</span>
+      </motion.a>
     </motion.div>
   );
 }
